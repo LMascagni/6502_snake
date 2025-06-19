@@ -1,7 +1,8 @@
   .org $8000
 
-; === STRINGS ===
+; === STRINGHE ===
 schermo: .asciiz "SNAKE     PUNTI:                        v 1.0     012345"
+test: .asciiz "TESTO DI PROVA"
 
 ; === CARATTERI CUSTOM (8 byte ciascuno) ===
 char_0: ; BOX 1-1
@@ -68,27 +69,62 @@ char_5: ; BOX 2-3
 setup:
   jsr lcd_init
   jsr define_custom_chars
-  
-  jsr draw_text
-  jsr draw_box
 
-  ; accensione LED
-  lda DDRA
-  ora #%00000001
-  sta DDRA
-
+  ; Spegni LED (bit 0 di PORTA)
   lda PORTA
-  ora #%00000001
+  and #%11111110
   sta PORTA
 
+  ; === Scrivi nella griglia ===
+  lda #3
+  sta row
+  lda #5
+  sta col
+  lda #17
+  sta val
+  jsr write_grid_cell
+
+  ; === Leggi dalla griglia ===
+  lda #3
+  sta row
+  lda #5
+  sta col
+  jsr read_grid_cell
+
+  sta val         ; memorizza il valore letto
+
+  ; stampa il valore letto per debug
+  jsr draw_val
+
+  ;cmp #1
+  ;bne skip_draw
+
+  ; stampa testo di prova
+  ;jsr draw_text
+
+;skip_draw:
+
+  ;jsr draw_box
+
 loop:
-  ; Attendi un input da PORTA
+  ; accendi LED
 
-  ;disegna sullo schermo
-  
+  ;jsr print_screen
 
+  ; delay 1 secondo
+  lda #$E8
+  sta time_delay_millis
+  lda #$03
+  sta time_delay_millis + 1
+  jsr delay_millis
 
   jmp loop
+
+; === ROUTINE: PRINT SCREEN ===
+print_screen:
+  jsr draw_text
+  jsr draw_box
+  rts
 
 ; === ROUTINE: DEFINISCI CARATTERI CUSTOM ===
 define_custom_chars:
@@ -215,6 +251,18 @@ draw_box:
 
   rts
 
+draw_val:
+  ; Posiziona cursore a riga 1, colonna 14
+  lda #$80
+  jsr lcd_send_instruction
+
+  ; Stampa il valore letto
+  lda val
+  adc #$30  ; Converti in ASCII (A=65, B=66, ..., Z=90)
+  jsr lcd_print_char
+
+  rts
+
 ; === INTERRUPT VECTORS ===
 nmi:
 irq:
@@ -222,6 +270,8 @@ irq:
 
   .include "lib/io.s"
   .include "lib/lcd.s"
+  .include "lib/time.s"
+  .include "lib/grid.s"
 
   .org $FFFA
   .word nmi

@@ -1,85 +1,99 @@
+; === lcd.s aggiornato: compatibile con LED su PORTA ===
+
 MESSAGE_PTR = $00
 
-;VIA Registers
-LCD_PORTB = $6000
-LCD_PORTA = $6001
-LCD_DDRB = $6002
-LCD_DDRA = $6003
+; VIA/LCD pins (bit alti)
+E  = %10000000  ; Enable pin
+RW = %01000000  ; Read/Write
+RS = %00100000  ; Register Select
 
-; VIA/LCD pins
-E  = %10000000  ; Enable pin bitcode 
-RW = %01000000  ; Read/Write pin bitcode
-RS = %00100000  ; Register Select pin bitcode
+; === TMP VARIABILE INTERNA ===
+tmp_porta: .byte 0
 
+; === Init ===
 lcd_init: 
   jsr via_init
 
-  lda #%00111000    ; Set 8-bit mode, 2-line display, 5x8 font
+  lda #%00111000    ; Function set: 8-bit, 2-line, 5x8
   jsr lcd_send_instruction
-  lda #%00001100    ; Display on, cursor on, blink off
+  lda #%00001100    ; Display ON, cursor OFF, blink OFF
   jsr lcd_send_instruction
-  lda #%00000110    ; Increment and shift cursor, don't shift display
+  lda #%00000110    ; Entry mode set: Increment, no shift
   jsr lcd_send_instruction
-  lda #$00000001    ; Clear display
+  lda #%00000001    ; Clear display
   jsr lcd_send_instruction
   rts
 
 via_init:
-  lda #%11111111    ; Set all pins on port B to output
-  sta LCD_DDRB
-  lda #%11100000    ; Set top 3 pins on port A to output
-  sta LCD_DDRA
+  lda #%11111111
+  sta DDRB
+  lda #%11100000    ; Only top 3 bits output (keep lower for LED)
+  sta DDRA
   rts
 
+; === Routine helper per scrittura sicura su PORTA ===
+; A contiene i nuovi valori dei bit 5-7, preserva 0-4
+safe_set_lcd_ctrl:
+  pha
+  lda PORTA
+  and #%00011111        ; preserva i bit 0–4 (es. LED)
+  sta tmp_porta
+  pla
+  ora tmp_porta
+  sta PORTA
+  rts
+
+; === Busy Wait ===
 lcd_wait_until_free:
   pha
-  lda #%00000000    ; Port B is input
-  sta LCD_DDRB
+  lda #%00000000
+  sta DDRB
+
 lcd_busy:
   lda #RW
-  sta LCD_PORTA
+  jsr safe_set_lcd_ctrl
+
   lda #(RW | E)
-  sta LCD_PORTA
-  lda LCD_PORTB
+  jsr safe_set_lcd_ctrl
+
+  lda PORTB
   and #%10000000
   bne lcd_busy
-  ; LCD Free
+
   lda #RW
-  sta LCD_PORTA
-  lda #%11111111    ; Port B is output
-  sta LCD_DDRB
+  jsr safe_set_lcd_ctrl
+
+  lda #%11111111
+  sta DDRB
   pla
   rts
 
+; === Istruzione LCD ===
 lcd_send_instruction:
   jsr lcd_wait_until_free
-  sta LCD_PORTB
-  lda #0            ; Clear RS/RW/E bits
-  sta LCD_PORTA
-  lda #E            ; Set E bit to send instruction
-  sta LCD_PORTA
-  lda #0            ; Clear RS/RW/E bits
-  sta LCD_PORTA
+  sta PORTB
+
+  lda #0
+  jsr safe_set_lcd_ctrl
+
+  lda #E
+  jsr safe_set_lcd_ctrl
+
+  lda #0
+  jsr safe_set_lcd_ctrl
   rts
 
+; === Scrivi un carattere ===
 lcd_print_char:
   jsr lcd_wait_until_free
-  sta LCD_PORTB
-  lda #RS           ; Set RS, Clear RW/E bits
-  sta LCD_PORTA
-  lda #(RS | E)     ; Set E bit to send instruction
-  sta LCD_PORTA
-  lda #RS           ; Clear E bits
-  sta LCD_PORTA
-  rts
+  sta PORTB
 
-print_message:  
-  ldy #0                 ; Character index counter init to zero (Using Y for indirect addressing)  
-print_next_char:         ; Print Char  
-  lda (MESSAGE_PTR),y    ; Load message byte with y-value offset from target of pointer.  
-  beq exit_print_next_char	; If we're done, go to loop  
-  jsr lcd_print_char     ; Print the currently-addressed Char  
-  iny                    ; Increment character index counter (Y)  
-  jmp print_next_char    ; print the next char
-exit_print_next_char:
+  lda #RS
+  jsr safe_set_lcd_ctrl
+
+  lda #(RS | E)
+  jsr safe_set_lcd_ctrl
+
+  lda #RS
+  jsr safe_set_lcd_ctrl
   rts
