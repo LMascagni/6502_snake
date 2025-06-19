@@ -1,8 +1,11 @@
   .org $8000
 
 ; === STRINGHE ===
-schermo: .asciiz "SNAKE     PUNTI:                        v 1.0     012345"
+schermo: .asciiz "SNAKE     PUNTI:                        v 1.0"
 test: .asciiz "TESTO DI PROVA"
+
+; === VARIABILI ===
+points = $02CC
 
 ; === CARATTERI CUSTOM (8 byte ciascuno) ===
 char_0: ; BOX 1-1
@@ -93,23 +96,26 @@ setup:
 
   sta val         ; memorizza il valore letto
 
-  ; stampa il valore letto per debug
-  jsr draw_val
+  ;imposta punteggio di test
+  lda #170
+  sta points
 
-  ;cmp #1
-  ;bne skip_draw
-
-  ; stampa testo di prova
-  ;jsr draw_text
-
-;skip_draw:
-
-  ;jsr draw_box
+  jmp loop
 
 loop:
   ; accendi LED
 
-  ;jsr print_screen
+  jsr print_screen
+
+  inc points
+  
+  ;se il punteggio è maggiore di 183 resettalo
+  lda points
+  cmp #183
+  bcc no_reset
+  lda #0
+  sta points
+no_reset:
 
   ; delay 1 secondo
   lda #$E8
@@ -122,8 +128,9 @@ loop:
 
 ; === ROUTINE: PRINT SCREEN ===
 print_screen:
-  jsr draw_text
-  jsr draw_box
+  jsr print_text
+  jsr print_grid
+  jsr print_points
   rts
 
 ; === ROUTINE: DEFINISCI CARATTERI CUSTOM ===
@@ -197,7 +204,7 @@ load_char_5:
   rts
 
 ; === ROUTINE: TESTO SCHERMO ===
-draw_text:
+print_text:
   lda #$80
   jsr lcd_send_instruction
 
@@ -212,7 +219,7 @@ end_print:
   rts
 
 ; === ROUTINE: DISEGNA BOX USANDO I CARATTERI DEFINITI ===
-draw_box:
+print_grid:
   ; Posiziona cursore a riga 1, colonna 6
   lda #$80 + $06
   jsr lcd_send_instruction
@@ -251,17 +258,55 @@ draw_box:
 
   rts
 
-draw_val:
-  ; Posiziona cursore a riga 1, colonna 14
-  lda #$80
+print_points:
+  lda #$CB         ; Posiziona cursore a riga 1, colonna 14
   jsr lcd_send_instruction
 
-  ; Stampa il valore letto
-  lda val
-  adc #$30  ; Converti in ASCII (A=65, B=66, ..., Z=90)
+  lda points       ; A = punti
+  sta tmp_offset   ; Usa tmp_offset come buffer temporaneo
+
+  ; Calcola centinaia
+  lda tmp_offset
+  ldx #0
+cent_loop:
+  cmp #100
+  blt fine_cent
+  sec
+  sbc #100
+  inx
+  jmp cent_loop
+fine_cent:
+  sta tmp_offset   ; resto
+  txa              ; centinaia
+  clc
+  adc #$30         ; ASCII
+  jsr lcd_print_char
+
+  ; Calcola decine
+  lda tmp_offset
+  ldx #0
+dec_loop:
+  cmp #10
+  blt fine_dec
+  sec
+  sbc #10
+  inx
+  jmp dec_loop
+fine_dec:
+  sta tmp_offset   ; resto
+  txa              ; decine
+  clc
+  adc #$30
+  jsr lcd_print_char
+
+  ; Calcola unità
+  lda tmp_offset   ; unità
+  clc
+  adc #$30
   jsr lcd_print_char
 
   rts
+
 
 ; === INTERRUPT VECTORS ===
 nmi:
