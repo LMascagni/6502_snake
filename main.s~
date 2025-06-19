@@ -1,0 +1,35 @@
+  .org $8000
+
+schermo_test_1: .asciiz "SNAKE |-| PUNTI:                        v 1.0 |_| 012345"
+
+setup:
+  jsr lcd_init
+  lda #<schermo_test_1
+  sta MESSAGE_PTR
+  lda #>schermo_test_1
+  sta MESSAGE_PTR + 1
+  jsr print_message
+
+
+;accensione led
+  lda DDRA
+  ora #%1
+  sta DDRA
+
+
+loop:
+  jmp loop
+
+nmi:
+irq:
+  rti
+
+;librerie
+ ; .inlcude "lib/time.s"
+  .include "lib/io.s"
+  .include "lib/lcd.s"
+
+  .org $FFFA
+  .word nmi
+  .word setup
+  .word irq
