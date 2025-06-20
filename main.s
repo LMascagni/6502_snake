@@ -73,6 +73,8 @@ setup:
   jsr lcd_init
   jsr define_custom_chars
 
+  jsr clear_grid
+
   ; Spegni LED (bit 0 di PORTA)
   lda PORTA
   and #%11111110

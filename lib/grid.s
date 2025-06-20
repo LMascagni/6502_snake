@@ -55,3 +55,15 @@ read_grid_cell:
   jsr calculate_offset
   lda grid, y
   rts
+
+; === ROUTINE: SVUOTA L'ARRAY GRID (13x14 = 182 celle) ===
+clear_grid:
+  ldx #0          ; Inizializza indice X a 0
+  lda #0          ; Valore zero da scrivere
+
+clear_loop:
+  sta grid, x     ; Scrive 0 nella posizione grid + X
+  inx             ; Incrementa X
+  cpx #182        ; Abbiamo raggiunto la fine?
+  bne clear_loop  ; Se no, continua il ciclo
+  rts
