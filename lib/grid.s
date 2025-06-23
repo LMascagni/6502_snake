@@ -1,47 +1,59 @@
-; === VARIABILI ===
-tmp_offset = $0200
-tmp_mult   = $0201
-row        = $0202
-col        = $0203
-val        = $0204
-
 ; === ARRAY grid 13x14 = 182 BYTE ===
-grid       = $0205  ; Array inizia subito dopo le variabili
+grid       = $0200  ; Array inizia a $0200
+
+; === VARIABILI === (dopo grid)
+tmp_offset = $0300
+tmp_mult   = $0301
+row        = $0302
+col        = $0303
+val        = $0304
+res_lsb    = $0305
+res_msb    = $0306
+
 
 ; === ROUTINE: CALCOLA OFFSET PER CELLA (row * 14 + col) ===
 ; Output: Y = offset
 calculate_offset:
   lda row
-  sta tmp_mult      ; tmp_mult = row
-
-  ; row * 8
-  lda tmp_mult
-  asl
-  asl
-  asl
+  sta tmp_mult
+  lda #14
   sta tmp_offset
 
-  ; + row * 4
-  lda tmp_mult
-  asl
-  asl
-  clc
-  adc tmp_offset
-  sta tmp_offset
+  jsr multiply
 
-  ; + row * 2
-  lda tmp_mult
-  asl
+  lda res_lsb
   clc
-  adc tmp_offset
-  sta tmp_offset  ; tmp_offset = row * 14
-
-  ; + col
-  lda col
-  clc
-  adc tmp_offset
+  adc col
   tay
   rts
+
+; === SUBROUTINE: MULTIPLICAZIONE tmp_offset * tmp_mult ===
+; OUT: res_lsb = risultato LSB
+;      res_msb = risultato MSB
+multiply:
+  lda #0
+  sta res_lsb
+  sta res_msb
+
+  ldy tmp_mult
+mul_loop:
+  beq mul_done
+
+  lda res_lsb
+  clc
+  adc tmp_offset
+  sta res_lsb
+
+  lda res_msb
+  adc #0
+  sta res_msb
+
+  dey
+  jmp mul_loop
+
+mul_done:
+  rts
+
 
 ; === ROUTINE: SCRIVI NELLA CELLA ===
 write_grid_cell:
@@ -58,12 +70,11 @@ read_grid_cell:
 
 ; === ROUTINE: SVUOTA L'ARRAY GRID (13x14 = 182 celle) ===
 clear_grid:
-  ldx #0          ; Inizializza indice X a 0
-  lda #0          ; Valore zero da scrivere
-
+  ldx #0
+  lda #0
 clear_loop:
-  sta grid, x     ; Scrive 0 nella posizione grid + X
-  inx             ; Incrementa X
-  cpx #182        ; Abbiamo raggiunto la fine?
-  bne clear_loop  ; Se no, continua il ciclo
+  sta grid, x
+  inx
+  cpx #182
+  bne clear_loop
   rts

@@ -7,6 +7,8 @@ test: .asciiz "TESTO DI PROVA"
 ; === VARIABILI ===
 points = $02CC
 
+
+
 ; === CARATTERI CUSTOM (8 byte ciascuno) ===
 char_0: ; BOX 1-1
   .byte %11111
@@ -105,7 +107,6 @@ setup:
   jmp loop
 
 loop:
-  ; accendi LED
 
   jsr print_screen
 
