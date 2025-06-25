@@ -15,15 +15,7 @@ display_col = $0403
 char_row = $0404
 char_col = $0405
 
-char_pos = $0500
-
-; variabili per snake
-direction = $0501   ;0 - no dir, 1 - up, 2 - down, 3 - left, 4 - right
-position_x = $0502
-position_y = $0503
-last_x = $0504
-last_y = $0505
-
+char_pos = $0406
 
 bitmap_bit_table:
   .byte %00010000, %00001000, %00000100, %00000010, %00000001
@@ -37,184 +29,57 @@ setup:
 
   jsr clear_grid
 
-  ; Inizializza la posizione del serpente
-  lda #7
+  lda #0
   sta row
-  sta position_y
-  lda #7
   sta col
-  sta position_x
   lda #1
   sta val
   jsr write_grid_cell
+  
+  inc col
+  inc row
+  jsr write_grid_cell
 
-  lda DDRA
-  and #%11100001  ; Imposta i bit 5-7 come output, preserva 0-4
-  sta DDRA
+  inc col
+  inc col
+   jsr write_grid_cell
+
+
+  ; Spegni LED (bit 0 di PORTA)
+  lda PORTA
+  and #%11111110
+  sta PORTA
 
   ;imposta punteggio di test
-  lda #0
+  lda #170
   sta points
 
   jmp loop
 
 loop:
-  ; Leggi input da tastiera
-  jsr read_input
-  ; Gestisci la direzione del serpente
-  jsr handle_movement
 
-  ; renderizza la griglia
   jsr render_grid
-  ; Stampa lo schermo
-  ; (testo, bordi, griglia e punteggio)
+
   jsr print_screen
 
   inc points
   
   ;se il punteggio è maggiore di 183 resettalo
   lda points
-  cmp #241
+  cmp #183
   bcc no_reset
   lda #0
   sta points
 no_reset:
 
   ; delay 1 secondo
-  lda #$00
+  lda #$E8
   sta time_delay_millis
-  lda #$01
+  lda #$03
   sta time_delay_millis + 1
   jsr delay_millis
 
   jmp loop
-
-; === ROUTINE: LEGGI INPUT ===
-read_input:
-  lda PORTA
-  and #%00011110  ; Maschera i bit 1-4
-
-  cmp #%00000010  ; Freccia sinistra
-  bne check_down
-  lda #3
-  sta direction
-  rts
-
-check_down:
-  cmp #%00000100  ; Freccia giù
-  bne check_right
-  lda #2
-  sta direction
-  rts
-
-check_right:
-  cmp #%00001000  ; Freccia destra
-  bne check_up
-  lda #4
-  sta direction
-  rts
-
-check_up:
-  cmp #%00010000  ; Freccia su
-  bne no_key
-  lda #1
-  sta direction
-  rts
-
-no_key:
-  lda #0
-  sta direction
-  rts
-
-handle_movement:
-  ; Gestisce la direzione del serpente
-  lda direction
-  bne move
-  rts
-
-move:
-  ; Salva la posizione precedente
-  lda position_x
-  sta last_x
-  lda position_y
-  sta last_y
-
-  ; Aggiorna la posizione in base alla direzione
-  lda direction
-  cmp #1          ; Su
-  beq move_up
-  cmp #2          ; Giù
-  beq move_down
-  cmp #3          ; Sinistra
-  beq move_left
-  cmp #4          ; Destra
-  beq move_right
-
-  rts
-
-move_up:
-  ldx position_y
-  beq no_move_up
-  dex
-  stx position_y
-no_move_up:
-  jmp draw_move
-
-move_down:
-  ldx position_y
-  cmp #15
-  beq no_move_down
-  inx
-  stx position_y
-no_move_down:
-  jmp draw_move
-
-move_left:
-  ldx position_x
-  beq no_move_left
-  dex
-  stx position_x
-no_move_left:
-  jmp draw_move
-
-move_right:
-  ldx position_x
-  cmp #14
-  beq no_move_right
-  inx
-  stx position_x
-no_move_right:
-  jmp draw_move
-
-draw_move:
-  ;cancellare la cella precedente se last_x e last_y sono diversi da position_x e position_y
-  lda last_x
-  cmp position_x
-  bne skip_check_y
-  lda last_y
-  cmp position_y
-  beq skip_clear_cell
-skip_check_y:
-  ;cancella la cella precedente
-  lda last_y
-  sta row
-  lda last_x
-  sta col
-  lda #0
-  sta val
-  jsr write_grid_cell
-  ;disegna la nuova cella
-  lda position_y
-  sta row
-  lda position_x
-  sta col
-  lda #1
-  sta val
-  jsr write_grid_cell
-
-skip_clear_cell:
-  rts
-
 
 ; === ROUTINE: PRINT SCREEN ===
 print_screen:
@@ -274,30 +139,15 @@ render_grid:
   sta char_col
 
 render_grid_loop:
-  ;calcola l'indirizzo CGRAM ((display_row * 3 + display_col) * 8) + $50
-  lda display_row
-  sta tmp_mult
-  lda #3
-  sta tmp_offset
-  jsr multiply
-  lda res_lsb
-  clc
-  adc display_col
-  sta tmp_mult
-  lda #8
-  sta tmp_offset
-  jsr multiply
-  lda res_lsb
-  clc
-  adc #$50
-  sta char_pos
+  ;calcola l'indirizzo in base a display_row e display_col ((display_row * 2 + display_col) * 8) + $4F
+  
 
-  ; manda l'indirizzo CGRAM all'lcd
-  ;lda #$40 + 16
-  lda char_pos
+
+;char 2
+  lda #$40 + 16
   jsr lcd_send_instruction
   
-render_char:
+render_char_2:
   ;calolo posizione relativa per grid
   ;row
   lda display_row
@@ -338,10 +188,10 @@ skip_pixel:
   ;incrementa la colonna
   inc char_col
   ;se la colonna è maggiore di 4, resetta e incrementa la riga e scrivi nell lcd tmp_char_row
-  ;se la riga è maggiore di 7 incrementa display_col, altrimenti torna a render_char_2
+  ;se la riga è maggiore di 7, termina, altrimenti torna a render_char_2
   lda char_col
   cmp #5
-  bne render_char
+  bne render_char_2
 
   ;se la colonna è maggiore di 4, manda il la riga del carattere all'lcd
   lda tmp_char_row
@@ -349,37 +199,14 @@ skip_pixel:
   lda #0
   sta tmp_char_row
 
+
   lda #0
   sta char_col
-
   inc char_row
-
   lda char_row
   cmp #8
-  bne render_char
-  lda #0
-  sta char_row
-  ;se la riga è maggiore di 7, incrementa display_col
-  inc display_col
-  ;se la colonna è maggiore di 2, incrementa display_row e resetta display_col
-  lda display_col
-  cmp #3
-  beq skip_render_grid_loop
-  jmp render_grid_loop
-skip_render_grid_loop:
-  ; resetta display_col
-  lda #0
-  sta display_col
-  ; incrementa display_row
-  inc display_row
-  ; se la riga è maggiore di 1, torna a render_grid_loop
-  lda display_row
-  cmp #2
-  beq end_render_grid
-  jmp render_grid_loop
-end_render_grid:
-
-  ; se la riga è maggiore di 1, termina
+  bne render_char_2
+  ;se la riga è maggiore di 7, termina
   rts
 
 
@@ -488,22 +315,22 @@ print_grid:
 
   lda #$80 + $08
   jsr lcd_send_instruction
-  lda #4
+  lda #3
   jsr lcd_print_char
 
   lda #$C0 + $06
   jsr lcd_send_instruction
-  lda #5
+  lda #3
   jsr lcd_print_char
 
   lda #$C0 + $07
   jsr lcd_send_instruction
-  lda #6
+  lda #3
   jsr lcd_print_char
 
   lda #$C0 + $08
   jsr lcd_send_instruction
-  lda #7
+  lda #3
   jsr lcd_print_char
 
   rts

@@ -11,12 +11,12 @@ res_lsb    = $0305
 res_msb    = $0306
 
 
-; === ROUTINE: CALCOLA OFFSET PER CELLA (row * 14 + col) ===
+; === ROUTINE: CALCOLA OFFSET PER CELLA (row * 16 + col) ===
 ; Output: Y = offset
 calculate_offset:
   lda row
   sta tmp_mult
-  lda #14
+  lda #16
   sta tmp_offset
 
   jsr multiply
@@ -66,15 +66,16 @@ write_grid_cell:
 read_grid_cell:
   jsr calculate_offset
   lda grid, y
+  sta val
   rts
 
-; === ROUTINE: SVUOTA L'ARRAY GRID (13x14 = 182 celle) ===
+; === ROUTINE: SVUOTA L'ARRAY GRID (15x16 = 240 celle) ===
 clear_grid:
   ldx #0
   lda #0
 clear_loop:
   sta grid, x
   inx
-  cpx #182
+  cpx #255 ; 256 celle (0-255)
   bne clear_loop
   rts
