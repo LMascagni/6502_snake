@@ -32,6 +32,17 @@ bitmap_bit_table:
 
 ; === SETUP ===
 setup:
+  ;ldx #$ff
+  ;txs
+  ;cli
+
+  ;setup dell'interrupt sul pin CB1
+  lda #%10010011
+  sta IER
+
+  lda #%00000001
+  sta PCR
+
   jsr lcd_init
   jsr define_custom_chars
 
@@ -55,12 +66,11 @@ setup:
   ;imposta punteggio di test
   lda #0
   sta points
+  sta direction
 
   jmp loop
 
 loop:
-  ; Leggi input da tastiera
-  jsr read_input
   ; Gestisci la direzione del serpente
   jsr handle_movement
 
@@ -70,7 +80,7 @@ loop:
   ; (testo, bordi, griglia e punteggio)
   jsr print_screen
 
-  inc points
+  ;inc points
   
   ;se il punteggio è maggiore di 183 resettalo
   lda points
@@ -80,12 +90,12 @@ loop:
   sta points
 no_reset:
 
-  ; delay 1 secondo
-  lda #$00
-  sta time_delay_millis
-  lda #$01
-  sta time_delay_millis + 1
-  jsr delay_millis
+  ; delay 256 ms
+  ;lda #$00
+  ;sta time_delay_millis
+  ;lda #$01
+  ;sta time_delay_millis + 1
+  ;jsr delay_millis
 
   jmp loop
 
@@ -153,38 +163,43 @@ move:
   rts
 
 move_up:
-  ldx position_y
+  lda position_y
   beq no_move_up
-  dex
-  stx position_y
+  sec
+  sbc #1
+  sta position_y
 no_move_up:
   jmp draw_move
 
 move_down:
-  ldx position_y
+  lda position_y   ; carica la Y attuale
   cmp #15
   beq no_move_down
-  inx
-  stx position_y
+  clc
+  adc #1
+  sta position_y
 no_move_down:
   jmp draw_move
 
 move_left:
-  ldx position_x
+  lda position_x
   beq no_move_left
-  dex
-  stx position_x
+  sec
+  sbc #1
+  sta position_x
 no_move_left:
   jmp draw_move
 
 move_right:
-  ldx position_x
+  lda position_x   ; carica la X attuale
   cmp #14
   beq no_move_right
-  inx
-  stx position_x
+  clc
+  adc #1
+  sta position_x
 no_move_right:
   jmp draw_move
+
 
 draw_move:
   ;cancellare la cella precedente se last_x e last_y sono diversi da position_x e position_y
@@ -513,6 +528,11 @@ print_grid:
 ; === INTERRUPT VECTORS ===
 nmi:
 irq:
+  inc points
+
+  ; Leggi input da tastiera
+  jsr read_input
+
   rti
 
   .include "lib/io.s"
@@ -520,7 +540,7 @@ irq:
   .include "lib/time.s"
   .include "lib/grid.s"
 
-  .org $FFFA
+  .org $fffA
   .word nmi
   .word setup
   .word irq
